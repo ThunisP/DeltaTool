@@ -1320,7 +1320,9 @@ PRO FM_PlotCategory, plotter, request, result
     ;    recognizeRangeX=1
     xtitle='Bias/2U'
   endif
-  if elabcode eq 16 or elabcode eq 77 then begin
+;KeesC 09DEC2017  
+;  if elabcode eq 16 or elabcode eq 77 then begin
+    if elabcode eq 18 or elabcode eq 77 then begin
     title='Standard Deviation Indicator'
     criteria=1.
     !x.range=[-3,3]
@@ -3252,6 +3254,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   
   adummy=fltarr(10) & adummy(*)=1.
   CheckCriteria, request, result, 'OU', criteria, adummy,alpha,criteriaOrig,LV
+  ;KeesC 31AUG2017: for forecast loop over LV values
   
   ;if elabcode eq 74 then criteria=1 ;for forecast no need of criteria
   ;  criteria=criteria/2.
@@ -3424,6 +3427,11 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   for iObs=nobsStart, npoints-1 do begin
     mypsym,allDataSymbol[iObs],1
     plots, allDataXY[iObs, 0], allDataXY[iObs, 1], psym=8, color=2+allDataColor[iObs], symsize=1.2*facSize  ;2*/maxAxis
+;KeesC 15APR2017    
+;    if allDataSymbol[iObs] eq 13 then begin
+;    mypsym,15,1
+;    plots, allDataXY[iObs, 0], allDataXY[iObs, 1], psym=8, color=0, symsize=1.2*facSize  ;2*/maxAxis
+;    endif
     recognizePoint[0,*]=[allDataXY[iObs, 0]-recognizeRange,allDataXY[iObs, 1] -recognizeRange]
     recognizePoint[1,*]=[allDataXY[iObs, 0]-recognizeRange,allDataXY[iObs, 1] +recognizeRange]
     recognizePoint[2,*]=[allDataXY[iObs, 0]+recognizeRange,allDataXY[iObs, 1] +recognizeRange]
@@ -3479,8 +3487,9 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
 ;  endif
 ;  
   mypsym,4,1
-  ;KeesC 14SEP2014
-  if criteria gt 0 and nmod eq 1 and isGroupSelection eq 0 then begin
+  ;KeesC 07APR2017
+;  if criteria gt 0 and nmod eq 1 and isGroupSelection eq 1 then begin ; group 90%
+    if criteria gt 0 and nmod eq 1 then begin ; group 90%
     psFact=plotter->getPSCharSizeFactor()
     cc=where(finite(allDataXY[*, 0]) eq 1,countValidStations)
     if countValidStations gt 0 then begin
@@ -3564,10 +3573,17 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
       if extraVal[2] eq 1 then pstr='Conserv.'
       if extraVal[2] eq 2 then pstr='Cautious'
       if extraVal[2] eq 3 then pstr='Model'
-      xyouts,.83,.92,'LV = '+strtrim(fix(LV),2),/normal,color=0
-      xyouts,.83,.89,'OU = '+ustr,/normal,color=0
-      xyouts,.83,.86,'Day Forecast = '+astr,/normal,color=0
-      xyouts,.83,.83,'Exc. Opt. = '+pstr,/normal,color=0
+;KeesC 31AUG2017
+      if elabCode ne 74 then xyouts,.83,.92,'LV = '+strtrim(fix(LV),2),/normal,color=0
+      if elabCode eq 74 then begin
+        kc=strtrim(extraVal[0],2)
+        extraval0=kc
+        if strmid(kc,0,1) eq '[' then extraVal0=strmid(kc,1,strlen(kc)-1)     ; loop over the 0
+        xyouts,.83,.91,'LV = '+strtrim(fix(extraVal0[0]),2),/normal,color=0   ; loop over the 0
+      endif
+      xyouts,.83,.88,'OU = '+ustr,/normal,color=0
+      xyouts,.83,.85,'Day Forecast = '+astr,/normal,color=0
+      xyouts,.83,.82,'Exc. Opt. = '+pstr,/normal,color=0
     endif
   endif else begin
     print, 'Warning: Set right criteria for this elaboration...'
@@ -3827,7 +3843,15 @@ PRO FM_PlotTable2, plotter, request, result
   extraValNumber=request->getExtraValuesNumber()
   if extraValNumber gt 0 then begin
     extraValues=request->getExtraValues()
-    ExcVal=strcompress(fix(extraValues[0]),/remove_all)
+    ;KeesC 02SEP2017
+    kc=strtrim(extraValues[0],2) 
+    if strmid(kc,0,1) ne '[' then ExcVal=extraValues[0]
+    if strmid(kc,0,1) eq '[' then begin
+      kc1=strmid(kc,1,strlen(kc)-2)
+      kc2=strsplit(kc1,',',/extract)
+      ExcVal=kc2[0]     ; only first lim value is plotted
+    endif
+    ExcVal=strcompress(fix(ExcVal),/remove_all)
   endif else begin
     ExcVal='0'
   endelse
@@ -4551,8 +4575,9 @@ PRO FM_PlotBugle, plotter, request, result, allDataXY, allDataColor, allDataSymb
     endfor
     
   endif
-  
-  if elabcode eq 15 or elabCode eq 78 or elabCode eq 18 or elabcode eq 93 or elabCode eq 94 or elabCode eq 95 then begin  ;R
+;KeesC 09DEC2017  
+;  if elabcode eq 15 or elabCode eq 78 or elabCode eq 18 or elabcode eq 93 or elabCode eq 94 or elabCode eq 95 then begin  ;R
+  if elabcode eq 15 or elabCode eq 78 or elabCode eq 16 or elabcode eq 93 or elabCode eq 94 or elabCode eq 95 then begin  ;R
   
     CheckCriteria, request, result, 'OU', criteria, adummy,alpha,criteriaOrig,LV
     betafac=criteriaOrig(5)
@@ -5328,7 +5353,9 @@ pro CheckCriteria, request, result, statistics, criteria, obsTimeSeries,alpha,cr
   beta=2.0
   
   ;if more than one pollutant or group mode statistic ne 90 percentile, no criteria found
+;KeesC 15APR2017  
   if n_elements(parCodes) gt 1 or GroupModeOKmode ne 1 then begin
+ ;     if n_elements(parCodes) gt 1 then begin
     goto,jumpEnd
   endif
   
@@ -5610,10 +5637,18 @@ pro legendGenericBuild,request,result,plotter
     thisStartX=startX+maxWidth+legoWidth+.02
     lego=[[thisStartX,startY], [thisStartX,startY+legoHeight], [thisStartX+legoWidth,startY+legoHeight], [thisStartX+legoWidth,startY], [thisStartX,startY]]
     mypsym,legSyms[i],1
+    ;KeesC 15APR2017
+;    coords=[thisStartX+(legoWidth/2), startY+.025]
     coords=[thisStartX+(legoWidth/2), startY+.002]
     coords=plotter->legendNormalize(coords)
-    plots, coords[0], coords[1], psym=8, color=2+legColorsPrint[i], /NORM, symsize=1.
-    ;coords=[thisStartX+legoWidth+.01, startY+.002]
+
+;KeesC 15APR2017    
+     plots, coords[0], coords[1], psym=8, color=2+legColorsPrint[i], /NORM, symsize=1
+;    plots, coords[0], coords[1], psym=8, color=2+legColorsPrint[i], /NORM, symsize=1.4
+;    if legSyms[0] eq 13 then begin
+;    mypsym,15,1
+;    plots, coords[0], coords[1], psym=8, color=0, /NORM, symsize=1.4
+;    endif
     coords=[thisStartX+legoWidth+.01, startY-.01]
     coords=plotter->legendNormalize(coords)
     ;    xyouts, coords[0], coords[1] , strmid(legNamesPrint[i],0,13), COLOR=0, /NORM, charsize=.8, charthick=.8,  WIDTH=textWidth
