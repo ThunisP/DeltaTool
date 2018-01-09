@@ -79,9 +79,9 @@ pro mypsym,number,size_symb
       USERSYM, X, Y,thick=2
     end
 
-    13:begin ; circle empty
+    13:begin ; circle full
     A = FINDGEN(17) * (!PI*2/16.)
-    USERSYM, size_symb*COS(A), size_symb*SIN(A)
+    USERSYM, 1.2*size_symb*COS(A), 1.2*size_symb*SIN(A),/fill
   end
 
   ; KeesC 20JUN2012
@@ -90,6 +90,10 @@ pro mypsym,number,size_symb
     Y = [-size_symb,  size_symb, size_symb, -size_symb, -size_symb]*.75
     USERSYM, X, Y, color=0
   end
+  15:begin ; circle empty
+  A = FINDGEN(17) * (!PI*2/16.)
+  USERSYM, 1.2*size_symb*COS(A), 1.2*size_symb*SIN(A)
+end
   else:  begin ; square line
     print, 'psym not present'
     X = [-size_symb, -size_symb, size_symb,  size_symb, -size_symb]*.75

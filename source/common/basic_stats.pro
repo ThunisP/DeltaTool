@@ -207,8 +207,8 @@ function sigmoid,x,xshift,stiffness
   ;
   ; OUTPUTS:
   ;  return : a sigmoid
-
-return,1/(1.+exp(-stiffness*(x-xshift)))
+; KeesC 8JAN2018
+return,1/(1.+exp(-stiffness*(double(x)-xshift)))
 
 end
 ;******************************

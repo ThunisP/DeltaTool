@@ -696,8 +696,8 @@ PRO SG_Computing, $
             ;            statXYResult[i1,i2,i3,i4,9]=stddevOM(runTemp)
             statXYGroup[i1,i2,i3,i4]=abs(nmb(obsTemp,runTemp))
           endif
-;KeesC 08DEC2017          
-;          if elabcode eq 15 or elabCode eq 78 or elabCode eq 18 then begin ; R buggle
+          ;KeesC 08DEC2017
+          ;          if elabcode eq 15 or elabCode eq 78 or elabCode eq 18 then begin ; R buggle
           if elabcode eq 15 or elabCode eq 78 or elabCode eq 16 then begin ; R buggle
             statXYResult[i1,i2,i3,i4,0]=criteriaOU/stddevOM(obsTemp)
             statXYResult[i1,i2,i3,i4,1]=correlate(obsTemp, runTemp)
@@ -723,8 +723,8 @@ PRO SG_Computing, $
             statXYResult[i1,i2,i3,i4,1]=rmse(obsTemp, runTemp)
             statXYGroup[i1,i2,i3,i4]=(rmse(obsTemp, runTemp)^2+bias(obsTemp, runTemp)^2)
           endif
-;KeesC 08DEC2017      
-;          if elabcode eq 16 or elabCode eq 77 then begin ;category NMSD
+          ;KeesC 08DEC2017
+          ;          if elabcode eq 16 or elabCode eq 77 then begin ;category NMSD
           if elabcode eq 18 or elabCode eq 77 then begin ;category NMSD
             if criteriaOU*mean(obsTemp) ne 0 then statXYResult[i1,i2,i3,i4,0]=(stddevOM(runTemp) - stddevOM(obsTemp))/(2.*criteriaOU)
             if criteriaOU*mean(obsTemp) eq 0 then statXYResult[i1,i2,i3,i4,0]=!values.f_nan
@@ -935,103 +935,107 @@ PRO SG_Computing, $
             statXYGroup[i1,i2,i3,i4]=nmb([obsTemp1,obsTemp2],[runTemp1,runTemp2])
           endif
 
-          ;******************
-          ;FIRST BLOCK (OLD)
-          ;******************
-          ;KeesC 06MAR2017
-          ;          if elabcode eq 74 or elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin ;OU Forecast
-          if elabcode eq 74 or elabCode eq 89 or elabCode eq 90 or elabCode eq 92 then begin ;OU Forecast
-            limitValue=extraVal(0)
-            ;            uncertainty=extraVal(1)/100.
-            if elabCode eq 74 then DayDelta=fix(extraVal(3))
-            FlexOption=extraVal(2)
-            ; Philippe 4/3/2015 Modif to discard stations where no exceedances (model or observed) occur
-            ccE=where(obsTemp ge limitValue or runTemp ge limitValue, countE)
-            if elabCode eq 74 then begin
-              if countE eq 0 then begin
-                obsTemp(*)=!values.f_nan
-                runTemp(*)=!values.f_nan
+          ;*******************************************************************
+          ; 8JAN2018 For test purposes
+          KeesBlock=1     ;  0 old version;  1 new sigmoid version
+          if KeesBlock eq 0 then begin
+            ;******************
+            ;FIRST BLOCK (OLD)
+            ;******************
+            ;KeesC 06MAR2017
+            ;          if elabcode eq 74 or elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin ;OU Forecast
+            if elabcode eq 74 or elabCode eq 89 or elabCode eq 90 or elabCode eq 92 then begin ;OU Forecast
+              limitValue=extraVal(0)
+              ;            uncertainty=extraVal(1)/100.
+              if elabCode eq 74 then DayDelta=fix(extraVal(3))
+              FlexOption=extraVal(2)
+              ; Philippe 4/3/2015 Modif to discard stations where no exceedances (model or observed) occur
+              ccE=where(obsTemp ge limitValue or runTemp ge limitValue, countE)
+              if elabCode eq 74 then begin
+                if countE eq 0 then begin
+                  obsTemp(*)=!values.f_nan
+                  runTemp(*)=!values.f_nan
+                endif
               endif
+
+              runOU=runTemp
+              ;obshlp = obsTemp(sort(obsTemp))
+              for ii=0,n_elements(obsTemp) -1 do begin
+                if extraVal(1) eq 999 then begin
+                  if strupcase(parCodes) eq 'PM10' then uncertainty=0.280*sqrt( (1.-0.13^2)*obsTemp(ii)^2+0.13^2*50.^2)
+                  if strupcase(parCodes) eq 'PM25' then uncertainty=0.360*sqrt( (1.-0.30^2)*obsTemp(ii)^2+0.30^2*25.^2)
+                  if strupcase(parCodes) eq 'O3'   then uncertainty=0.180*sqrt( (1.-0.79^2)*obsTemp(ii)^2+0.79^2*120.^2)
+                  if strupcase(parCodes) eq 'NO2'  then uncertainty=0.240*sqrt( (1.-0.20^2)*obsTemp(ii)^2+0.24^2*200.^2)
+                endif else begin
+                  uncertainty=obsTemp(ii)*extraval(1)/100.
+                endelse
+                if runtemp(ii) lt obsTemp(ii) then runOU(ii)=min([runTemp(ii)+uncertainty,obsTemp(ii)])
+                if runtemp(ii) ge obsTemp(ii) then runOU(ii)=max([runTemp(ii)-uncertainty,obsTemp(ii)])
+              endfor
+              runTemp=runOU
+
+              CountGaPlus=0
+              CountGaMinus=0
+              CountFaAlarm=0
+              CountMiAlarm=0
+              countAlarm=0
+              ; start sigmoid part
+              for ii=0,n_elements(obsTemp) -1 do begin
+
+                oplus =obsTemp(ii)+uncertainty
+                ominus=obsTemp(ii)-uncertainty
+
+                if oplus lt limitValue and runTemp(ii) lt limitValue then begin
+                  CountGaMinus++
+                endif
+                if oplus lt limitValue and runTemp(ii) ge limitValue then begin
+                  CountFaAlarm++
+                endif
+                if ominus ge limitValue and runTemp(ii) lt limitValue then begin
+                  CountMiAlarm++
+                  countAlarm++
+                endif
+                if ominus ge limitValue and runTemp(ii) ge limitValue then begin
+                  CountGAplus++
+                  countAlarm++
+                endif
+                if ominus lt limitValue and oplus ge limitValue and runTemp(ii) lt limitValue then begin
+                  if flexOption eq 1 then CountMiAlarm++
+                  if flexOption gt 1 then CountGaMinus++
+                  if flexOption eq 1 then CountAlarm++
+                endif
+                if ominus lt limitValue and oplus ge limitValue and runTemp(ii) ge limitValue then begin
+                  if flexOption eq 2 then CountFaAlarm++
+                  if flexOption ne 2 then CountGaPlus++
+                  if flexOption eq 1 then CountAlarm++
+                endif
+              endfor
+              ; end sigmoid part
+              if statType ge 1 then countAlarm=countAlarm/24.
+              if statType ge 1 then countFaAlarm=countFaAlarm/24.
+              if statType ge 1 then countMiAlarm=countMiAlarm/24.
+              if statType ge 1 then countGaplus=countGaplus/24.
+              if statType ge 1 then countGaminus=countGaminus/24.
+
             endif
 
-            runOU=runTemp
-            ;obshlp = obsTemp(sort(obsTemp))
-            for ii=0,n_elements(obsTemp) -1 do begin
-              if extraVal(1) eq 999 then begin
-                if strupcase(parCodes) eq 'PM10' then uncertainty=0.280*sqrt( (1.-0.13^2)*obsTemp(ii)^2+0.13^2*50.^2)
-                if strupcase(parCodes) eq 'PM25' then uncertainty=0.360*sqrt( (1.-0.30^2)*obsTemp(ii)^2+0.30^2*25.^2)
-                if strupcase(parCodes) eq 'O3'   then uncertainty=0.180*sqrt( (1.-0.79^2)*obsTemp(ii)^2+0.79^2*120.^2)
-                if strupcase(parCodes) eq 'NO2'  then uncertainty=0.240*sqrt( (1.-0.20^2)*obsTemp(ii)^2+0.24^2*200.^2)
-              endif else begin
-                uncertainty=obsTemp(ii)*extraval(1)/100.
-              endelse
-              if runtemp(ii) lt obsTemp(ii) then runOU(ii)=min([runTemp(ii)+uncertainty,obsTemp(ii)])
-              if runtemp(ii) ge obsTemp(ii) then runOU(ii)=max([runTemp(ii)-uncertainty,obsTemp(ii)])
-            endfor
-            runTemp=runOU
+            if elabCode eq 74 then begin
 
-            CountGaPlus=0
-            CountGaMinus=0
-            CountFaAlarm=0
-            CountMiAlarm=0
-            countAlarm=0
-
-            for ii=0,n_elements(obsTemp) -1 do begin
-
-              oplus =obsTemp(ii)+uncertainty
-              ominus=obsTemp(ii)-uncertainty
-
-              if oplus lt limitValue and runTemp(ii) lt limitValue then begin
-                CountGaMinus++
-              endif
-              if oplus lt limitValue and runTemp(ii) ge limitValue then begin
-                CountFaAlarm++
-              endif
-              if ominus ge limitValue and runTemp(ii) lt limitValue then begin
-                CountMiAlarm++
-                countAlarm++
-              endif
-              if ominus ge limitValue and runTemp(ii) ge limitValue then begin
-                CountGAplus++
-                countAlarm++
-              endif
-              if ominus lt limitValue and oplus ge limitValue and runTemp(ii) lt limitValue then begin
-                if flexOption eq 1 then CountMiAlarm++
-                if flexOption gt 1 then CountGaMinus++
-                if flexOption eq 1 then CountAlarm++
-              endif
-              if ominus lt limitValue and oplus ge limitValue and runTemp(ii) ge limitValue then begin
-                if flexOption eq 2 then CountFaAlarm++
-                if flexOption ne 2 then CountGaPlus++
-                if flexOption eq 1 then CountAlarm++
-              endif
-            endfor
-
-            if statType ge 1 then countAlarm=countAlarm/24.
-            if statType ge 1 then countFaAlarm=countFaAlarm/24.
-            if statType ge 1 then countMiAlarm=countMiAlarm/24.
-            if statType ge 1 then countGaplus=countGaplus/24.
-            if statType ge 1 then countGaminus=countGaminus/24.
-
-          endif
-
-          if elabCode eq 74 then begin
-
-            if countMiAlarm+countFaAlarm gt 0 then far=float(countFaAlarm)/float((CountGaPlus+countFaAlarm))
-            if countMiAlarm+countFaAlarm eq 0 then far=1
-            if countFaAlarm ge countMiAlarm then sign=1
-            if countFaAlarm lt countMiAlarm then sign=-1  ;only for target
-            statXYResult[i1,i2,i3,i4,0]=sign*crmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
-            statXYResult[i1,i2,i3,i4,1]=bias(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
-            statXYResult[i1,i2,i3,i4,2]=far
-            statXYGroup[i1,i2,i3,i4]=rmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
-          endif
-          ;KeesC 06MAR2017
-          ;          if elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin
-          if elabCode eq 89 or elabCode eq 90 or elabCode eq 92 then begin
-            if elabCode eq 89 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+CountMiAlarm
-            if elabCode eq 90 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+countFaAlarm
-            if elabCode eq 89 or elabCode eq 90 then statXYResult[i1,i2,i3,i4,1]=countGaPlus
+              if countMiAlarm+countFaAlarm gt 0 then far=float(countFaAlarm)/float((CountGaPlus+countFaAlarm))
+              if countMiAlarm+countFaAlarm eq 0 then far=1
+              if countFaAlarm ge countMiAlarm then sign=1
+              if countFaAlarm lt countMiAlarm then sign=-1  ;only for target
+              statXYResult[i1,i2,i3,i4,0]=sign*crmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
+              statXYResult[i1,i2,i3,i4,1]=bias(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
+              statXYResult[i1,i2,i3,i4,2]=far
+              statXYGroup[i1,i2,i3,i4]=rmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
+            endif
+            ;KeesC 06MAR2017
+            ;          if elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin
+            if elabCode eq 89 or elabCode eq 90 or elabCode eq 92 then begin
+              if elabCode eq 89 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+CountMiAlarm
+              if elabCode eq 90 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+countFaAlarm
+              if elabCode eq 89 or elabCode eq 90 then statXYResult[i1,i2,i3,i4,1]=countGaPlus
             ;KeesC 06MAR2017
             ;            if elabCode eq 91 then begin
             ;               if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm eq 0 then statXYResult[i1,i2,i3,i4,1]=1.
@@ -1039,98 +1043,98 @@ PRO SG_Computing, $
             ;               if (countGaPlus+countMiAlarm) eq 0 and (countGaPlus+countFaAlarm) gt 0 then statXYResult[i1,i2,i3,i4,1]=2.
             ;               if (countGaPlus+countMiAlarm) ne 0 then statXYResult[i1,i2,i3,i4,1]=(countGaPlus+countFaAlarm)/(countGaPlus+countMiAlarm)
             ;            endif
-            if elabCode eq 92 then begin
-              if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm eq 0 then statXYResult[i1,i2,i3,i4,1]=1.
-              if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
-              if (countGaPlus+countFaAlarm) eq 0 and countMiAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
-              if (countGaPlus+countMiAlarm) ne 0 then statXYResult[i1,i2,i3,i4,1]=0.5*(countGaPlus/(countGaPlus+countMiAlarm)+countGaPlus/(countGaPlus+countFaAlarm))
+              if elabCode eq 92 then begin
+                if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm eq 0 then statXYResult[i1,i2,i3,i4,1]=1.
+                if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
+                if (countGaPlus+countFaAlarm) eq 0 and countMiAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
+                if (countGaPlus+countMiAlarm) ne 0 then statXYResult[i1,i2,i3,i4,1]=0.5*(countGaPlus/(countGaPlus+countMiAlarm)+countGaPlus/(countGaPlus+countFaAlarm))
+              endif
             endif
-          endif
 
-          ; SECOND BLOCK (based on sigmoid)
-          ; The sigmoid function is in basic_stats
+          endif ; KeesBlock=0
+          ;******************************************************************
+          if KeesBlock eq 1 then begin
+            ; SECOND BLOCK (based on sigmoid)
+            ; The sigmoid function is in basic_stats
 
-          ;          if elabCode eq 74 or elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin ;OU Forecast
-          ;            limitValue=extraVal(0)
-          ;            if elabCode eq 74 then DayDelta=fix(extraVal(3))
-          ;            FlexOption=extraVal(2)
-          ;            ; Philippe 4/3/2015 Modif to discard stations where no exceedances (model or observed) occur
-          ;            ccE=where(obsTemp ge limitValue or runTemp ge limitValue, countE)
-          ;            if elabCode eq 74 then begin
-          ;              if countE eq 0 then begin
-          ;                obsTemp(*)=!values.f_nan
-          ;                runTemp(*)=!values.f_nan
-          ;              endif
-          ;            endif
-          ;
-          ;            runOU=runTemp
-          ;            ;obshlp = obsTemp(sort(obsTemp))
-          ;            for ii=0,n_elements(obsTemp) -1 do begin
-          ;              if extraVal(1) eq 999 then begin
-          ;                if strupcase(parCodes) eq 'PM10' then uncertainty=0.280*sqrt( (1.-0.13^2)*obsTemp(ii)^2+0.13^2*50.^2)
-          ;                if strupcase(parCodes) eq 'PM25' then uncertainty=0.360*sqrt( (1.-0.30^2)*obsTemp(ii)^2+0.30^2*25.^2)
-          ;                if strupcase(parCodes) eq 'O3'   then uncertainty=0.180*sqrt( (1.-0.79^2)*obsTemp(ii)^2+0.79^2*120.^2)
-          ;                if strupcase(parCodes) eq 'NO2'  then uncertainty=0.240*sqrt( (1.-0.20^2)*obsTemp(ii)^2+0.24^2*200.^2)
-          ;              endif else begin
-          ;                uncertainty=obsTemp(ii)*extraval(1)/100.
-          ;              endelse
-          ;              if runtemp(ii) lt obsTemp(ii) then runOU(ii)=min([runTemp(ii)+uncertainty,obsTemp(ii)])
-          ;              if runtemp(ii) ge obsTemp(ii) then runOU(ii)=max([runTemp(ii)-uncertainty,obsTemp(ii)])
-          ;            endfor
-          ;
-          ;
-          ;            CountGaPlus=0
-          ;            CountGaMinus=0
-          ;            CountFaAlarm=0
-          ;            CountMiAlarm=0
-          ;            countAlarm=0
-          ;
-          ;            countGaplus=total(sigmoid(obstemp,limitValue,uncertainty)*sigmoid(runtemp,limitValue,uncertainty))
-          ;            countFaAlarm=total((1.-sigmoid(obstemp,limitValue,uncertainty))*sigmoid(runtemp,limitValue,uncertainty))
-          ;            countMaAlarm=total(sigmoid(obstemp,limitValue,uncertainty)*(1.-sigmoid(runtemp,limitValue,uncertainty)))
-          ;            countGaMinus=total((1.-sigmoid(obstemp,limitValue,uncertainty))*(1.-sigmoid(runtemp,limitValue,uncertainty)))
-          ;            countAlarm=total(sigmoid(obstemp,limitValue,uncertainty))
-          ;
-          ;            if statType ge 1 then countAlarm=countAlarm/24.
-          ;            if statType ge 1 then countFaAlarm=countFaAlarm/24.
-          ;            if statType ge 1 then countMiAlarm=countMiAlarm/24.
-          ;            if statType ge 1 then countGaplus=countGaplus/24.
-          ;            if statType ge 1 then countGaminus=countGaminus/24.
-          ;
-          ;          endif
-          ;
-          ;          if elabCode eq 74 then begin
-          ;            runTemp=runOU
-          ;
-          ;            if countMiAlarm+countFaAlarm gt 0 then far=float(countFaAlarm)/float((CountGaPlus+countFaAlarm))
-          ;            if countMiAlarm+countFaAlarm lt 0.1 then far=1
-          ;            if countFaAlarm ge countMiAlarm then sign=1
-          ;            if countFaAlarm lt countMiAlarm then sign=-1  ;only for target
-          ;            statXYResult[i1,i2,i3,i4,0]=sign*crmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
-          ;            statXYResult[i1,i2,i3,i4,1]=bias(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
-          ;            statXYResult[i1,i2,i3,i4,2]=far
-          ;            statXYGroup[i1,i2,i3,i4]=rmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
-          ;          endif
-          ;          if elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin
-          ;            if elabCode eq 89 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+CountMiAlarm
-          ;            if elabCode eq 90 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+countFaAlarm
-          ;            if elabCode eq 89 or elabCode eq 90 then statXYResult[i1,i2,i3,i4,1]=countGaPlus
-          ;            if elabCode eq 91 then begin
-          ;              if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm eq 0 then statXYResult[i1,i2,i3,i4,1]=1.
-          ;              if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
-          ;              if (countGaPlus+countMiAlarm) eq 0 and (countGaPlus+countFaAlarm) gt 0 then statXYResult[i1,i2,i3,i4,1]=2.
-          ;              if (countGaPlus+countMiAlarm) ne 0 then statXYResult[i1,i2,i3,i4,1]=(countGaPlus+countFaAlarm)/(countGaPlus+countMiAlarm)
-          ;            endif
-          ;            if elabCode eq 92 then begin
-          ;              if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm eq 0 then statXYResult[i1,i2,i3,i4,1]=1.
-          ;              if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
-          ;              if (countGaPlus+countFaAlarm) eq 0 and countMiAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
-          ;              if (countGaPlus+countMiAlarm) ne 0 then statXYResult[i1,i2,i3,i4,1]=0.5*(countGaPlus/(countGaPlus+countMiAlarm)+countGaPlus/(countGaPlus+countFaAlarm))
-          ;            endif
-          ;          endif
+            if elabCode eq 74 or elabCode eq 89 or elabCode eq 90 or elabCode eq 91 or elabCode eq 92 then begin ;OU Forecast
+              limitValue=extraVal(0)
+              if elabCode eq 74 then DayDelta=fix(extraVal(3))
+              FlexOption=extraVal(2)
+              ; Philippe 4/3/2015 Modif to discard stations where no exceedances (model or observed) occur
+              ccE=where(obsTemp ge limitValue or runTemp ge limitValue, countE)
+              if elabCode eq 74 then begin
+                if countE eq 0 then begin
+                  obsTemp(*)=!values.f_nan
+                  runTemp(*)=!values.f_nan
+                endif
+              endif
+
+              runOU=runTemp
+              ;obshlp = obsTemp(sort(obsTemp))
+              for ii=0,n_elements(obsTemp) -1 do begin
+                if extraVal(1) eq 999 then begin
+                  if strupcase(parCodes) eq 'PM10' then uncertainty=0.280*sqrt( (1.-0.13^2)*obsTemp(ii)^2+0.13^2*50.^2)
+                  if strupcase(parCodes) eq 'PM25' then uncertainty=0.360*sqrt( (1.-0.30^2)*obsTemp(ii)^2+0.30^2*25.^2)
+                  if strupcase(parCodes) eq 'O3'   then uncertainty=0.180*sqrt( (1.-0.79^2)*obsTemp(ii)^2+0.79^2*120.^2)
+                  if strupcase(parCodes) eq 'NO2'  then uncertainty=0.240*sqrt( (1.-0.20^2)*obsTemp(ii)^2+0.24^2*200.^2)
+                endif else begin
+                  uncertainty=obsTemp(ii)*extraval(1)/100.
+                endelse
+                if runtemp(ii) lt obsTemp(ii) then runOU(ii)=min([runTemp(ii)+uncertainty,obsTemp(ii)])
+                if runtemp(ii) ge obsTemp(ii) then runOU(ii)=max([runTemp(ii)-uncertainty,obsTemp(ii)])
+              endfor
+
+              CountGaPlus=0
+              CountGaMinus=0
+              CountFaAlarm=0
+              CountMiAlarm=0
+              countAlarm=0
+; KeesC 8JAN2018: next line ?? Probably not
+;              runTemp=runOU
+              
+              countGaplus=total(sigmoid(obstemp,limitValue,uncertainty)*sigmoid(runtemp,limitValue,uncertainty))
+              countFaAlarm=total((1.-sigmoid(obstemp,limitValue,uncertainty))*sigmoid(runtemp,limitValue,uncertainty))
+              ; KeesC 8JAN2018: MaAlarm -> MiAlarm
+              countMiAlarm=total(sigmoid(obstemp,limitValue,uncertainty)*(1.-sigmoid(runtemp,limitValue,uncertainty)))
+              countGaMinus=total((1.-sigmoid(obstemp,limitValue,uncertainty))*(1.-sigmoid(runtemp,limitValue,uncertainty)))
+              countAlarm=total(sigmoid(obstemp,limitValue,uncertainty))
+
+              if statType ge 1 then countAlarm=countAlarm/24.
+              if statType ge 1 then countFaAlarm=countFaAlarm/24.
+              if statType ge 1 then countMiAlarm=countMiAlarm/24.
+              if statType ge 1 then countGaplus=countGaplus/24.
+              if statType ge 1 then countGaminus=countGaminus/24.
+
+            endif
+
+            if elabCode eq 74 then begin
+              runTemp=runOU
+
+              if countMiAlarm+countFaAlarm gt 0 then far=float(countFaAlarm)/float((CountGaPlus+countFaAlarm))
+              if countMiAlarm+countFaAlarm lt 0.1 then far=1
+              if countFaAlarm ge countMiAlarm then sign=1
+              if countFaAlarm lt countMiAlarm then sign=-1  ;only for target
+              statXYResult[i1,i2,i3,i4,0]=sign*crmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
+              statXYResult[i1,i2,i3,i4,1]=bias(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
+              statXYResult[i1,i2,i3,i4,2]=far
+              statXYGroup[i1,i2,i3,i4]=rmse(obsTemp, runTemp)/resilience(obsTemp,statType,DayDelta)
+            endif
+            if elabCode eq 89 or elabCode eq 90 or elabCode eq 92 then begin
+              if elabCode eq 89 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+CountMiAlarm
+              if elabCode eq 90 then statXYResult[i1,i2,i3,i4,0]=countGaPlus+countFaAlarm
+              if elabCode eq 89 or elabCode eq 90 then statXYResult[i1,i2,i3,i4,1]=countGaPlus
+              if elabCode eq 92 then begin
+                if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm eq 0 then statXYResult[i1,i2,i3,i4,1]=1.
+                if (countGaPlus+countMiAlarm) eq 0 and countFaAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
+                if (countGaPlus+countFaAlarm) eq 0 and countMiAlarm gt 0 then statXYResult[i1,i2,i3,i4,1]=0.
+                if (countGaPlus+countMiAlarm) ne 0 then statXYResult[i1,i2,i3,i4,1]=0.5*(countGaPlus/(countGaPlus+countMiAlarm)+countGaPlus/(countGaPlus+countFaAlarm))
+              endif
+            endif
+          endif ; end KeesBlock=1
+          ;********************************************************
 
           if elabcode eq 85 or elabCode eq 86 or elabCode eq 87 or elabCode eq 88 then begin  ;potency calculations
-
             if i3 eq 0 then begin
               percentileInTimeSeries=fix(n_elements(runTemp)*0.95)
               dimPercentile(i4)=n_elements(runTemp)-percentileInTimeSeries
@@ -1309,30 +1313,29 @@ PRO SG_Computing, $
                 ;                Run9StatResult=!values.f_nan
               endelse
             endif
-; KeesC 26APR2017            
-            if groupStatToApplyCode eq 1 then begin  ;Worst 90%% group
+            ;Worst 90%% group
+            if groupStatToApplyCode eq 1 then begin
               if countFinite gt 0 then begin
-                obsGroupStatResult=reform(statXY0(ccFin))  ;Target: +/- crmse
-                runGroupStatResult=reform(statXY1(ccFin))  ;Target: bias
+                obsGroupStatResult=reform(statXY0(ccFin))
+                runGroupStatResult=reform(statXY1(ccFin))
                 ;KeesC 10SEP2012
-                run2GroupStatResult=reform(statXY2(ccFin))  ; Target: not used             
-                GroupStatResult=reform(statXYGroupHlp(ccFin))  ; Target: rmse
+                run2GroupStatResult=reform(statXY2(ccFin))
+                GroupStatResult=reform(statXYGroupHlp(ccFin))
                 resSort=sort(GroupStatResult)
                 if total(where(elabCode eq [2,7,11,15,78,18,33,76])) ge 0 then resSort=reverse(resSort)
                 ; PHIL change (-1) which means that for groups having less than 10 stations, 1 station is left out. For groups
-;                example: if n_elements(resSort) is 9, then fix(0.9*n_elements(resSort)) = 8 => No stations left out ?? 
                 ; between 10 and 20 two stations are left out...
-                medIdx=resSort[fix(0.9*n_elements(resSort))]   ; if <
-                obsStatResult=obsGroupStatResult(medIdx)  ; value for a specific station
-                runStatResult=runGroupStatResult(medIdx)  ; value for a specific station
+                medIdx=resSort[fix(0.9*n_elements(resSort))]
+                obsStatResult=obsGroupStatResult(medIdx)
+                runStatResult=runGroupStatResult(medIdx)
                 if elabcode eq 52 or elabcode eq 21 or elabCode eq 81 then begin
-                  ccNeg=where(obsGroupStatResult lt 0.,countNeg)  ; Target: number of stations left
-                  ccPos=where(obsGroupStatResult gt 0.,countPos)  ; Target: number of stations right
-                  runStatResult=mean(runGroupStatResult)   ; mean bias
-                  obsStatResult=mean(abs(obsGroupStatResult))   ; mean crmse 
-                  distmean=sqrt(runStatResult^2+obsStatResult^2)  ; rmse for the 2 above
-                  runStatResult=runStatResult*GroupStatResult(medIdx)/distmean  ; ??
-                  obsStatResult=obsStatResult*GroupStatResult(medIdx)/distmean  ; ??
+                  ccNeg=where(obsGroupStatResult lt 0.,countNeg)
+                  ccPos=where(obsGroupStatResult gt 0.,countPos)
+                  runStatResult=mean(runGroupStatResult)
+                  obsStatResult=mean(abs(obsGroupStatResult))
+                  distmean=sqrt(runStatResult^2+obsStatResult^2)
+                  runStatResult=runStatResult*GroupStatResult(medIdx)/distmean
+                  obsStatResult=obsStatResult*GroupStatResult(medIdx)/distmean
                   if countNeg gt countPos then obsStatResult=-obsStatResult
                   if countNeg eq countPos then obsStatResult=0
                 endif
@@ -1978,19 +1981,11 @@ pro FM_StatTable2, request, result, plotter
 
     ;  fileName=  modelCodes(0)+'_'+parcodes(0)+'.dat'  ;Printing only in case of single stations choice
     ;KeesC 08FRB2016
-  tijd=strsplit(systime(),' ',/extract)
-  tijd1=strsplit(tijd[3],':',/extract)
-  tijd2=tijd[2]+tijd[1]+tijd[4]+'_'+tijd1[0]+'h'+tijd1[1]
-  fileName='Summary_Report_'+tijd2+'.csv'
- ;fileName='Summary_Report.csv'
+    fileName='Summary_Report.csv'
     request->openDataDumpFile, fileName;/ADDSYSTIME; --> filename=StatisticName+systime+.txt
-  ;KeesC 06MAR2017
-  addForc=''
-  if (elabcode eq 96 or elabCode eq 97 or elabCode eq 98) then addForc=',GA+,GA-,FA,MA,CA'
-  if strupcase(frequency) eq 'HOUR' then request->writeDataDumpFileRecord,$
-    'Name,Obscode,Region,Type,lon,lat,alt,MO,MM,SO,SM,R,RMSE,ExcO,ExcM,TargetOU,OU'+addforc
-    if strupcase(frequency) eq 'YEAR' then request->writeDataDumpFileRecord, 'Name,Obscode,Region,Type,lon,lat,alt,MO,MM,TargetOU,OU'
 
+    if strupcase(frequency) eq 'HOUR' then request->writeDataDumpFileRecord, 'Name,Obscode,Region,Type,lon,lat,alt,MO,MM,SO,SM,R,RMSE,ExcO,ExcM,TargetOU,OU'
+    if strupcase(frequency) eq 'YEAR' then request->writeDataDumpFileRecord, 'Name,Obscode,Region,Type,lon,lat,alt,MO,MM,TargetOU,OU'
     statXYResultS=fltarr(forSLastIndex+1,nvar)
     uncertaintyAverage=fltarr(forSLastIndex+1)
 
@@ -2027,7 +2022,6 @@ pro FM_StatTable2, request, result, plotter
       statXYResultS(i,4)=(stddevOM(runTemp)-stddevOM(obsTemp))/(betafac*CriteriaOU)
 
       if strupcase(frequency) eq 'YEAR' then statXYResultS(i,7)=0.
-    ;
       ;**********************
       ;KeesC 06MAR2017 Calculate GA+, GA-, FA, MA here
       ;
@@ -2113,8 +2107,7 @@ pro FM_StatTable2, request, result, plotter
         if statType ge 1 then countGaminus=countGaminus/24.
       endif
       ; *************************************
-    ;KeesC 06MAR2017
-;    txt=string(' ',format='(a130)')
+      ;KeesC 08FEB2016
       if strupcase(frequency) eq 'HOUR' then begin
         ; Name Obscode Region Type lon lat alt MO MM SO SM R RMSE ExcO ExcM TargOU OU'
         if elabCode ne 96 and elabCode ne 97 and elabCode ne 98 then begin
@@ -2135,20 +2128,9 @@ pro FM_StatTable2, request, result, plotter
             fix(CountFaAlarm),',',fix(CountMiAlarm),',',fix(CountAlarm),$
             format='(a'+string(strlen(obsnames(i)))+',a1,a10,a1,a10,a1,a20,13(a1,f8.3),5(a1,i5))')
           txt=strcompress(txt,/remove_all)
-        
         endif
         request->writeDataDumpFileRecord, txt
-
-    endif else begin
-      ; Name Obscode Region Type lon lat alt MO MM TargetOU OU'
-      txt=string(obsnames(i),',',obsCodes(i),',',regNamesAll(i),',',categoryInfo(1,i),',',$
-        obsLongitudes(i),',', obsLatitudes(i),',',obsAltitudes(i),',',$
-        mean(obsTemp),',',mean(runTemp),',',bias(obsTemp, runTemp)/(betafac*CriteriaOU(0)),',',CriteriaOU(0),$
-        ;        format='(a'+string(strlen(obsnames(i)))+',1x,a10,1x,a10,1x,a20,21(1x,f8.3))')
-        format='(a'+string(strlen(obsnames(i)))+',a1,a10,a1,a10,a1,a20,21(a1,f8.3))')
-      txt=strcompress(txt,/remove_all)
-      request->writeDataDumpFileRecord, txt
-    endelse
+      endif
 
       ; !!! redefine statXYResultS (i,5) to contain threshold info after printing exceedances
       obsTempSort=obsTemp(sort(obsTemp))
