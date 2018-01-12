@@ -110,7 +110,7 @@ PRO FM_PlotBars, plotter, request, result
   obsbar=1
 ;KeesC 06MAR2017  
 ;  if total(where(elabCode eq [2,3,4,5,7,8,14,23,24,28,30,33,54,91,92,93,94,95])) ge 0 then begin
-  if total(where(elabCode eq [2,3,4,5,7,8,14,23,24,28,30,33,54,92,93,94,95])) ge 0 then begin
+  if total(where(elabCode eq [2,3,4,5,7,8,14,23,24,28,30,33,54,92,93,94,95,103])) ge 0 then begin
     allDataXY(*,*,*,*,0)=0.
     obsbar=0
     if ifree eq '1101' then begin
@@ -262,9 +262,10 @@ PRO FM_PlotBars, plotter, request, result
     or elabCode eq 23 or elabCode eq 24 then ytitle='[%] '
   if elabCode eq 26 then ytitle='[mg/m3*hrs] '
   if elabCode eq 27 then ytitle='[mg/m3*days] '
-  if elabCode eq 89 or elabCode eq 90 then ytitle='[Nb] '
+  if elabCode eq 89 or elabCode eq 90 or elabcode eq 101 or elabcode eq 102 then ytitle='[Nb] '
 ;KeesC 06MAR2017
-  if elabCode ge 92 and elabCode le 95 then ytitle='[1]'  
+  if elabCode ge 92 and elabCode le 95 then ytitle='[1]' 
+  if elabcode eq 103 then ytitle='[1]' 
   
   cumulstr=''
   if elabCode eq 38 then begin
@@ -3226,7 +3227,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   
   result->setMultipleDrawMainTitle, 'PERFORMANCE REPORT:   '+multipleTitle + ' ' + modCodes[0]
   
-  if elabCode eq 74 then begin
+  if elabCode eq 74 or elabcode eq 100 then begin
     no=n_elements(allDataSymbol)/nmod
     allDataSymbol(0:no-1)=9  ;mod1
     if nmod gt 1 then allDataSymbol(1*no:2*no-1)=8  ;mod2
@@ -3293,7 +3294,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   endif
   
   maxAxis=max([max(abs(allDataXY(*,0:1)),/nan),1.5])
-  if elabCode eq 74 then maxAxis=max([max(abs(allDataXY(*,0:1)),/nan),1.5])
+  if elabCode eq 74 or elabcode eq 100 then maxAxis=max([max(abs(allDataXY(*,0:1)),/nan),1.5])
   plotRange=maxAxis + maxAxis*.4
   if finite(maxAxis) eq 0 then plotRange=1
   if finite(maxAxis) eq 0 then maxAxis=1
@@ -3319,6 +3320,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   ;Result->setMultipleDrawMainTitle, 'SUMMARY STATISTICS'
   title='ASSESSMENT TARGET PLOT'
   if elabCode eq 74 then title='FORECAST TARGET PLOT'
+  if elabCode eq 100 then title='FORECAST-SIGMOID TARGET PLOT'
   plot, indgen(10),color=0,xrange=[-plotRange,plotRange],yrange=[-plotRange,plotRange], $
     ystyle=1,/nodata,title=title+'   '+pars,charsize=facSize,background=255, $
     xticks=xt,xtickv=xv,xtickname=xtn,$
@@ -3336,7 +3338,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
     ;    endif
     ; end Phil 14/09/2014
     plots, CIRCLE(0, 0, 1), /data, thick=2, color=0
-    if elabcode ne 74 then plots, CIRCLE(0, 0, 1./sqrt(1.+criteriaOrig(5)^2)), /data, thick=2, color=0,linestyle=2
+    if elabcode ne 74 and elabcode ne 100 then plots, CIRCLE(0, 0, 1./sqrt(1.+criteriaOrig(5)^2)), /data, thick=2, color=0,linestyle=2
   endif else begin
     plots, CIRCLE(0, 0, 1), /data, thick=2, color=0
   endelse
@@ -3371,7 +3373,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   ;  xyouts, -plotRange*0.1, -plotRange*0.95, 'BIAS < 0',charthick=2, color=0,/data,charsize=facSize*1.5
   xyouts, -plotRange*0.1, plotRange*0.85, 'BIAS > 0', color=0,/data,charsize=facSize*1.5
   xyouts, -plotRange*0.1, -plotRange*0.95, 'BIAS < 0', color=0,/data,charsize=facSize*1.5
-  if elabcode eq 74 then begin  ;forecast
+  if elabcode eq 74 or elabcode eq 100 then begin  ;forecast
     ;    xyouts, -plotRange*0.95, -plotRange*0.07, 'FA < MA',charthick=2, color=0,/data,charsize=facSize*1.5
     ;    xyouts, plotRange*0.65, -plotRange*0.07,  'FA > MA',charthick=2, color=0,/data,charsize=facSize*1.5
     xyouts, -plotRange*0.95, -plotRange*0.07, 'FA < MA', color=0,/data,charsize=facSize*1.5
@@ -3531,7 +3533,7 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
       ;      xyouts,0.18,0.88,strtrim(percentageCrit,2)+'%',color=colorPerc,/normal,$
       ;        charthick=4,charsize=3*psFact
       xyouts,0.10,0.88,'MQI = '+strtrim(strmid(MQO90thperc,4,6),2),color=colorPerc,/normal,charsize=3*psFact
-      if elabCode ne 74 then xyouts,0.20,0.84,'Y='+strtrim(strmid(MQO90thpercYear,4,6),2),color=colorPercYear,/normal,charsize=1.5*psFact
+      if elabCode ne 74 and elabcode ne 100 then xyouts,0.20,0.84,'Y='+strtrim(strmid(MQO90thpercYear,4,6),2),color=colorPercYear,/normal,charsize=1.5*psFact
       ;setUserFont, lastUserFont
       if resPoscript eq 0 then begin
         ;!p.font=0
@@ -3547,9 +3549,8 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
   
     ;KeesC 11SEP2014
     ; Check deeply MM february 2015
-    if criteria gt 0. and elabcode ne 74 then begin
-    
-    
+    if criteria gt 0. and elabcode ne 74 and elabcode ne 100 then begin
+        
       ustr=strcompress(fix(criteriaOrig[0]),/remove_all)
       if nmod eq 1 then gam=strmid(strcompress(gammaValue*criteriaOrig[0],/remove_all),0,4)
       astr=strmid(strcompress(criteriaOrig[1],/remove_all),0,4)
@@ -3574,8 +3575,8 @@ PRO FM_PlotTarget, plotter, request, result, allDataXY, allDataColor, allDataSym
       if extraVal[2] eq 2 then pstr='Cautious'
       if extraVal[2] eq 3 then pstr='Model'
 ;KeesC 31AUG2017
-      if elabCode ne 74 then xyouts,.83,.92,'LV = '+strtrim(fix(LV),2),/normal,color=0
-      if elabCode eq 74 then begin
+      if elabCode ne 74 and elabcode ne 100 then xyouts,.83,.92,'LV = '+strtrim(fix(LV),2),/normal,color=0
+      if elabCode eq 74 or elabcode eq 100 then begin
         kc=strtrim(extraVal[0],2)
         extraval0=kc
         if strmid(kc,0,1) eq '[' then extraVal0=strmid(kc,1,strlen(kc)-1)     ; loop over the 0
@@ -3925,23 +3926,21 @@ PRO FM_PlotTable2, plotter, request, result
     ;xyouts,xmin+0.01,ymax-0.12,'INDICATOR',/data,charsize=1.2*facSize*psFact,color=0,charthick=2.3
     xyouts,xmin-0.00,ymax-0.12,'INDICATOR',/data,charsize=1.2*facSize*psFact,color=0
     ;setUserFont, lastUserFont
-    
-    minVal=[0,    0, -2, 0, -2,  -2, 0, -2]
+ 
+;KeesC 9JAN2018    
+;    minVal=[0,    0, -2, 0, -2,  -2, 0, -2]
+    minVal=[0,    0, -2, 0, 0,  -2, 0, 0]
     maxVal=[100,100,  2, 2,  2,  2,  2,  2]
-    ;KeesC 24NOV2013
-    ;    fillint1=['20',  '20',  '-1.2', '0.4','-1.2','0.4','-1.2','20']
-    ;    fillint2=['40',  '40',  '-0.4', '0.8','-0.4','0.8','-0.4','40']
-    ;    fillint3=['60',  '60',  ' 0.4', '1.2',' 0.4','1.2', '0.4','60']
-    ;    fillint4=['80',  '80',  ' 1.2', '1.6',' 1.2','1.6', '1.2','80']
+
     fillstr=strarr(8,10) & fillint=intarr(8)
     fillint(0)=4 & fillstr(0,0:3)=['20','40','60','80']
     fillint(1)=4 & fillstr(1,0:3)=['20','40','60','80']
     fillint(2)=9 & fillstr(2,0:8)=['-1.5','-1','-.7','-.5','0','.5','.7','1.0','1.5']
     fillint(3)=4 & fillstr(3,0:3)=['.5','.7','1.0','1.5']
-    fillint(4)=9 & fillstr(4,0:8)=['-1.5','-1','-.7','-.5','0','.5','.7','1.0','1.5']
+    fillint(4)=4 & fillstr(4,0:3)=['.5','.7','1.0','1.5']
     fillint(5)=9 & fillstr(5,0:8)=['-1.5','-1','-.7','-.5','0','.5','.7','1.0','1.5']
     fillint(6)=4 & fillstr(6,0:3)=['.5','.7','1.0','1.5']
-    fillint(7)=9 & fillstr(7,0:8)=['-1.5','-1','-.7','-.5','0','.5','.7','1.0','1.5']
+    fillint(7)=4 & fillstr(7,0:3)=['.5','.7','1.0','1.5']
     
     ;KeesC 18SEP2014
     mus=request->getParameterMeasureUnits()
@@ -3995,23 +3994,25 @@ PRO FM_PlotTable2, plotter, request, result
       if ii eq 1 then xx=[0.2,0.4,0.6,0.8]
       if ii eq 2 then xx=[.125,.25,0.325,0.375,0.5,.625,0.675,.75,.875]
       if ii eq 3 then xx=[.25,.35,.5,.75]
-      if ii eq 4 then xx=[.125,.25,0.325,0.375,0.5,.625,0.675,.75,.875]
+      if ii eq 4 then xx=[.25,.35,.5,.75]
       if ii eq 5 then xx=[.125,.25,0.325,0.375,0.5,.625,0.675,.75,.875]
       if ii eq 6 then xx=[.25,.35,.5,.75]
-      if ii eq 7 then xx=[.125,.25,0.325,0.375,0.5,.625,0.675,.75,.875]
+      if ii eq 7 then xx=[.25,.35,.5,.75]
       
       criteria=0
       if ii ge 2 then criteria=1.
       
-      fillValMin=[0,0,-criteria,0, -criteria,-criteria, 0, -criteria]
+;      fillValMin=[0,0,-criteria,0, -criteria,-criteria, 0, -criteria]
+      fillValMin=[0,0,-criteria,0, 0,-criteria, 0, 0]
       fillValMax=[0,0, criteria,1,  criteria, criteria, 1,  criteria]
       
       xminfill=xmin+0.25+(xmax-0.10-xmin-0.25)*(fillValMin(ii)-minVal(ii))/(maxVal(ii)-minVal(ii))
       xmaxfill=xmin+0.25+(xmax-0.10-xmin-0.25)*(fillValMax(ii)-minVal(ii))/(maxVal(ii)-minVal(ii))
       
-      if criteria gt 0 then begin
+      if criteria gt 0 then begin  ; 4 7      4=3      7=6
         dx=xmaxfill-xminfill
-        if ii ne 3 and ii ne 5 and ii ne 6 then begin
+; KeesC 8JAN2018        
+        if ii ne 3 and ii ne 5 and ii ne 6 and ii ne 4 and ii ne 7 then begin   ; 1 2
           polyfill,[xminfill+0.15*dx,xminfill+0.15*dx,xmaxfill-0.15*dx,xmaxfill-0.15*dx],[ymax-0.20-ii*0.095,ymax-0.16-ii*0.095,ymax-0.16-ii*0.095,ymax-0.20-ii*0.095],color=160,/data
           polyfill,[xminfill,xminfill,xminfill+0.15*dx,xminfill+0.15*dx],[ymax-0.20-ii*0.095,ymax-0.16-ii*0.095,ymax-0.16-ii*0.095,ymax-0.20-ii*0.095],color=207,/data
           polyfill,[xmaxfill-0.15*dx,xmaxfill-0.15*dx,xmaxfill,xmaxfill],[ymax-0.20-ii*0.095,ymax-0.16-ii*0.095,ymax-0.16-ii*0.095,ymax-0.20-ii*0.095],color=207,/data
@@ -4027,7 +4028,8 @@ PRO FM_PlotTable2, plotter, request, result
               [ymax-0.20-ii*0.095,ymax-0.19-ii*0.095],color=0,/data,thick=2,linestyle=0
           endfor
         endif
-        if ii eq 3 or ii eq 6 then begin
+        ; KeesC 8JAN2018
+        if ii eq 3 or ii eq 6 or ii eq 4 or ii eq 7 then begin
           polyfill,[xminfill,xminfill,xmaxfill-0.30*dx,xmaxfill-0.30*dx],[ymax-0.20-ii*0.095,$
             ymax-0.16-ii*0.095,ymax-0.16-ii*0.095,ymax-0.20-ii*0.095],color=160,/data
           polyfill,[xmaxfill-0.30*dx,xmaxfill-0.30*dx,xmaxfill,xmaxfill],[ymax-0.20-ii*0.095,$
@@ -4046,7 +4048,8 @@ PRO FM_PlotTable2, plotter, request, result
       plots,[xmin+0.25,xmax-0.10],[ymax-0.16-ii*0.095,ymax-0.16-ii*0.095],/data,thick=2,color=0
       plots,[xmax-0.10,xmax-0.05],[ymax-0.20-ii*0.095,ymax-0.20-ii*0.095],/data,thick=2,color=0,linestyle=2
       plots,[xmax-0.10,xmax-0.05],[ymax-0.16-ii*0.095,ymax-0.16-ii*0.095],/data,thick=2,color=0,linestyle=2
-      if ii le 1 or ii eq 3 or ii eq 6 then begin
+ ;KeesC 8JAN2018     
+      if ii le 1 or ii eq 3 or ii eq 6 or ii eq 4 or ii eq 7 then begin   ;0 3 6
         plots,[xmin+0.25,xmin+0.25],[ymax-0.20-ii*0.095,ymax-0.16-ii*0.095],/data,thick=2,color=0
       endif else begin
         plots,[xmin+0.2,xmin+0.25],[ymax-0.20-ii*0.095,ymax-0.20-ii*0.095],/data,thick=2,color=0,linestyle=2
@@ -4421,7 +4424,7 @@ PRO FM_PlotTargetLegend, plotter, request, result
   if checkDataNan(allDataXY) then begin
     goto,jumpend
   endif
-  if elabCode eq 74 then begin
+  if elabCode eq 74 or elabcode eq 100 then begin
     legendGenericBuild74,request,result,plotter
   endif else begin
     legendGenericBuild,request,result,plotter
@@ -5918,15 +5921,15 @@ pro legendGenericBuild74,request,result,plotter
   startY=0.9
   
   mypsym,9,2
-  plots,startX,startY,psym=8,/normal,color=colors_balls(0),symsize=1.2
+  plots,startX,startY,psym=8,/normal,color=colors_balls(4),symsize=1.2
   xyouts,startX+.02,startY-0.02,' FAR < 0.2 ',/normal,color=0,charsize=2.
-  plots,startX,startY-0.15,psym=8,/normal,color=colors_balls(1),symsize=1.2
+  plots,startX,startY-0.15,psym=8,/normal,color=colors_balls(3),symsize=1.2
   xyouts,startX+.02,startY-0.17,' 0.2 < FAR < 0.4 ',/normal,color=0,charsize=2.
   plots,startX,startY-0.30,psym=8,/normal,color=colors_balls(2),symsize=1.2
   xyouts,startX+.02,startY-0.32,' 0.4 < FAR < 0.6 ',/normal,color=0,charsize=2.
-  plots,startX,startY-0.45,psym=8,/normal,color=colors_balls(3),symsize=1.2
+  plots,startX,startY-0.45,psym=8,/normal,color=colors_balls(1),symsize=1.2
   xyouts,startX+.02,startY-0.47,' 0.6 < FAR < 0.8 ',/normal,color=0,charsize=2.
-  plots,startX,startY-0.60,psym=8,/normal,color=colors_balls(4),symsize=1.2
+  plots,startX,startY-0.60,psym=8,/normal,color=colors_balls(0),symsize=1.2
   xyouts,startX+.02,startY-0.62,' 0.8 < FAR < 1.0 ',/normal,color=0,charsize=2.
   
   noplot:
@@ -5982,36 +5985,36 @@ pro legendGenericBuildDiag0,request,result,plotter
       legPrint=strarr(1)
       legPrint(0)=modelCodes+'-'+scenarioCodes+'-'+statName
       legColors2=legColors & legSyms2=legSyms & legPrint2=['OBS']
-      if elabcode eq 89 then legPrint(0)=legPrint(0) + '(MA)'
-      if elabcode eq 90 then legPrint(0)=legPrint(0) + '(FA)'
-      if elabcode eq 89 then legPrint2=['(MA+GA+)']
-      if elabcode eq 90 then legPrint2=['(FA+GA+)']
+      if elabcode eq 89 or elabcode eq 101 then legPrint(0)=legPrint(0) + '(MA)'
+      if elabcode eq 90 or elabcode eq 102 then legPrint(0)=legPrint(0) + '(FA)'
+      if elabcode eq 89 or elabcode eq 101 then legPrint2=['(MA+GA+)']
+      if elabcode eq 90 or elabcode eq 102 then legPrint2=['(FA+GA+)']
     endif
     if ifree eq '0100' then begin
       legPrint=modelCodes+'-'+parCodes+'-'+scenarioCodes+'-'+statName
       legColors2=legColors & legSyms2=legSyms & legPrint2=['OBS']
-      if elabcode eq 89 then legPrint(0)=legPrint(0) + '(MA)'
-      if elabcode eq 90 then legPrint(0)=legPrint(0) + '(FA)'
-      if elabcode eq 89 then legPrint2=['(MA+GA+)']
-      if elabcode eq 90 then legPrint2=['(FA+GA+)']
+      if elabcode eq 89 or elabcode eq 101 then legPrint(0)=legPrint(0) + '(MA)'
+      if elabcode eq 90 or elabcode eq 102 then legPrint(0)=legPrint(0) + '(FA)'
+      if elabcode eq 89 or elabcode eq 101 then legPrint2=['(MA+GA+)']
+      if elabcode eq 90 or elabcode eq 102 then legPrint2=['(FA+GA+)']
     endif
     if ifree eq '0010' then begin
       legPrint=strarr(1)
       legPrint(0)=parCodes+'-'+modelCodes+'-'+statName
       legColors2=legColors & legSyms2=legSyms & legPrint2=['']
-      if elabcode eq 89 then legPrint(0)=legPrint(0) + '(MA)'
-      if elabcode eq 90 then legPrint(0)=legPrint(0) + '(FA)'
-      if elabcode eq 89 then legPrint2=['(MA+GA+)']
-      if elabcode eq 90 then legPrint2=['(FA+GA+)']
+      if elabcode eq 89 or elabcode eq 101 then legPrint(0)=legPrint(0) + '(MA)'
+      if elabcode eq 90 or elabcode eq 102 then legPrint(0)=legPrint(0) + '(FA)'
+      if elabcode eq 89 or elabcode eq 101 then legPrint2=['(MA+GA+)']
+      if elabcode eq 90 or elabcode eq 102 then legPrint2=['(FA+GA+)']
     endif
     if ifree eq '0001' then begin
       legPrint=strarr(1)
       legPrint(0)=parCodes+'-'+modelCodes+'-'+scenarioCodes
       legColors2=legColors & legSyms2=[9] & legPrint2=['OBS']
-      if elabcode eq 89 then legPrint(0)=legPrint(0) + '(MA)'
-      if elabcode eq 90 then legPrint(0)=legPrint(0) + '(FA)'
-      if elabcode eq 89 then legPrint2=['(MA+GA+)']
-      if elabcode eq 90 then legPrint2=['(FA+GA+)']
+      if elabcode eq 89 or elabcode eq 101 then legPrint(0)=legPrint(0) + '(MA)'
+      if elabcode eq 90 or elabcode eq 102 then legPrint(0)=legPrint(0) + '(FA)'
+      if elabcode eq 89 or elabcode eq 101 then legPrint2=['(MA+GA+)']
+      if elabcode eq 90 or elabcode eq 102 then legPrint2=['(FA+GA+)']
     endif
     if total(where(elabCode eq [2,3,4,5,7,8,23,24,28,30,33,54,93,94,95])) ge 0  then legPrint2=['']
     ;    legprint=legprint(0:0)
